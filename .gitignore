@@ -1,0 +1,37 @@
+# SQLite database files
+*.db
+*.db-journal
+
+# Compiled binaries
+secretsafe
+secretsafe.exe
+*.exe
+*.o
+*.out
+
+# TLS Certificates & Keys
+*.pem
+
+# Node.js dependencies
+node_modules/
+dist/
+.vite/
+
+# Temporary / PID files
+*.pid
+*.log
+
+# IDE & OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Android specific builds & properties
+.gradle/
+build/
+local.properties
+*.iml
+android/app/build/
+android/.gradle/
+android/local.properties

@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-darkBg: #0B0C10;
+  --color-darkCard: #1F2833;
+  --color-primaryNeon: #66FCF1;
+  --color-secondaryNeon: #45A29E;
+  --color-textLight: #C5C6C7;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+body {
+  background-color: #0B0C10;
+  color: #C5C6C7;
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* Premium glassmorphism effects */
+.glass-panel {
+  background: rgba(31, 40, 51, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(102, 252, 241, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-panel-neon {
+  background: rgba(31, 40, 51, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(102, 252, 241, 0.25);
+  box-shadow: 0 0 15px rgba(102, 252, 241, 0.1);
+}
+
+/* Custom scrollbar design */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0C10;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2833;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #66FCF1;
+}
+
+/* Neon ring borders */
+.neon-glow {
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.3);
+}
+
+.neon-glow-purple {
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+}

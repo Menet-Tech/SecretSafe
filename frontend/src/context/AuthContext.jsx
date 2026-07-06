@@ -1,0 +1,101 @@
+import React, { createContext, useState, useEffect, useContext } from 'react';
+
+const AuthContext = createContext(null);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [serverUrl, setServerUrl] = useState(localStorage.getItem('serverUrl') || 'https://localhost:8051');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (token) {
+      fetchUserInfo();
+    } else {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const fetchUserInfo = async () => {
+    try {
+      const response = await fetch(`${serverUrl}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data);
+      } else {
+        // Token might be expired
+        logout();
+      }
+    } catch (error) {
+      console.error('Failed to verify user token', error);
+      logout();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (username, password, customServerUrl) => {
+    const targetUrl = customServerUrl.replace(/\/$/, ''); // Remove trailing slash
+    const response = await fetch(`${targetUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      const errMsg = await response.text();
+      throw new Error(errMsg || 'Login failed');
+    }
+
+    const data = await response.json();
+    setToken(data.token);
+    setServerUrl(targetUrl);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('serverUrl', targetUrl);
+    
+    // User info is fetched via the useEffect dependency or manual query
+    const meResponse = await fetch(`${targetUrl}/api/auth/me`, {
+      headers: { 'Authorization': `Bearer ${data.token}` },
+    });
+    if (meResponse.ok) {
+      const meData = await meResponse.json();
+      setUser(meData);
+      return meData;
+    }
+    throw new Error('Failed to retrieve user profile after login');
+  };
+
+  const logout = () => {
+    setUser(null);
+    setToken('');
+    localStorage.removeItem('token');
+  };
+
+  const apiFetch = async (endpoint, options = {}) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return fetch(`${serverUrl}${cleanEndpoint}`, {
+      ...options,
+      headers,
+    });
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, serverUrl, loading, login, logout, apiFetch }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
