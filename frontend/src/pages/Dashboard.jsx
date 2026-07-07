@@ -26,7 +26,8 @@ export default function Dashboard({ onNavigate }) {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const response = await fetch(`${serverUrl}/api/health`);
+        const cleanUrl = serverUrl.replace(/\/$/, '');
+        const response = await fetch(`${cleanUrl}/api/health`);
         if (response.ok) {
           setServerStatus('connected');
         } else {

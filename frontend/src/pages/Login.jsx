@@ -13,7 +13,8 @@ export default function Login() {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        const response = await fetch(`${serverUrl}/api/health`);
+        const cleanUrl = serverUrl.replace(/\/$/, '');
+        const response = await fetch(`${cleanUrl}/api/health`);
         if (response.ok) {
           setServerStatus('connected');
         } else {
@@ -119,11 +120,8 @@ export default function Login() {
         </form>
 
         <div className="flex justify-center items-center gap-2 mt-6 pt-4 border-t border-gray-800 text-xs">
-          <span className="text-gray-500">Server:</span>
-          <span className="text-gray-400 font-mono truncate max-w-[200px]" title={serverUrl}>
-            {serverUrl}
-          </span>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold ${
+          <span className="text-gray-500">Server Status:</span>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold ${
             serverStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
             serverStatus === 'disconnected' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
             'bg-gray-500/10 text-gray-400 border border-gray-500/25'
@@ -133,8 +131,8 @@ export default function Login() {
               serverStatus === 'disconnected' ? 'bg-red-400' :
               'bg-gray-400'
             }`}></span>
-            {serverStatus === 'connected' ? 'Connected' :
-             serverStatus === 'disconnected' ? 'Disconnected' :
+            {serverStatus === 'connected' ? 'Online' :
+             serverStatus === 'disconnected' ? 'Offline' :
              'Checking...'}
           </span>
         </div>
