@@ -34,8 +34,18 @@ start_backend() {
         return
     fi
 
-    # Compile the Go backend for Linux if binary does not exist
+    # Compile the Go backend if binary does not exist or if code has changed
+    REBUILD=false
     if [ ! -f "$BACKEND_DIR/secretsafe" ]; then
+        REBUILD=true
+    else
+        # Rebuild if any Go source file is newer than the binary
+        if [ -n "$(find "$BACKEND_DIR" -name "*.go" -newer "$BACKEND_DIR/secretsafe" -print -quit 2>/dev/null)" ]; then
+            REBUILD=true
+        fi
+    fi
+
+    if [ "$REBUILD" = true ]; then
         echo -e "\nBuilding Linux backend binary..."
         (cd "$BACKEND_DIR" && export GO111MODULE=on && go build -o secretsafe)
         if [ $? -ne 0 ]; then
