@@ -3,7 +3,7 @@
 *.db-journal
 
 # Compiled binaries
-secretsafe
+/backend/secretsafe
 secretsafe.exe
 *.exe
 *.o

@@ -36,6 +36,17 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <!-- Receiver for notification actions -->
+        <receiver
+            android:name=".service.ApprovalReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.secretsafe.APPROVE" />
+                <action android:name="com.secretsafe.DENY" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
