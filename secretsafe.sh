@@ -8,10 +8,18 @@ FRONTEND_PID_FILE="/tmp/secretsafe_frontend.pid"
 BACKEND_LOG="/tmp/secretsafe_backend.log"
 FRONTEND_LOG="/tmp/secretsafe_frontend.log"
 
+# Clean variables from carriage returns (CRLF fallback for Linux)
+BACKEND_DIR="${BACKEND_DIR%$'\r'}"
+FRONTEND_DIR="${FRONTEND_DIR%$'\r'}"
+BACKEND_PID_FILE="${BACKEND_PID_FILE%$'\r'}"
+FRONTEND_PID_FILE="${FRONTEND_PID_FILE%$'\r'}"
+BACKEND_LOG="${BACKEND_LOG%$'\r'}"
+FRONTEND_LOG="${FRONTEND_LOG%$'\r'}"
+
 # Load environment variables if .env exists
 if [ -f .env ]; then
-    # Export all variables from .env file
-    export $(grep -v '^#' .env | xargs)
+    # Export all variables from .env file, cleaning any Windows carriage returns
+    export $(grep -v '^#' .env | tr -d '\r' | xargs)
 fi
 
 # Fallback to port 8051 if not defined in .env
@@ -29,7 +37,7 @@ start_backend() {
     # Compile the Go backend for Linux if binary does not exist
     if [ ! -f "$BACKEND_DIR/secretsafe" ]; then
         echo -e "\nBuilding Linux backend binary..."
-        (cd "$BACKEND_DIR" && go build -o secretsafe)
+        (cd "$BACKEND_DIR" && export GO111MODULE=on && go build -o secretsafe)
         if [ $? -ne 0 ]; then
             echo "Error: Failed to compile backend"
             return
