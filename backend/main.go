@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"log"
 	"net/http"
 	"os"
@@ -68,6 +69,7 @@ func main() {
 	mux.Handle("GET /api/auth/users", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.ListUsers))))
 	mux.Handle("PUT /api/auth/users/{id}", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.UpdateUser))))
 	mux.Handle("DELETE /api/auth/users/{id}", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.DeleteUser))))
+	mux.Handle("POST /api/admin/settings/upload-tls", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.UploadTLS))))
 
 	// Wrap entire router with CORS support
 	corsHandler := corsMiddleware(mux)
@@ -99,8 +101,25 @@ func main() {
 		log.Fatalf("Failed to generate/read TLS certificates: %v", err)
 	}
 
-	log.Printf("SecretSafe HTTPS Server starting on port %s...\n", port)
-	if err := http.ListenAndServeTLS(":"+port, certFile, keyFile, finalHandler); err != nil {
+	// Build custom TLS server with dynamic certificate reloading via GetCertificate
+	tlsConfig := &tls.Config{
+		GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+			if err != nil {
+				return nil, err
+			}
+			return &cert, nil
+		},
+	}
+
+	server := &http.Server{
+		Addr:      ":" + port,
+		Handler:   finalHandler,
+		TLSConfig: tlsConfig,
+	}
+
+	log.Printf("SecretSafe HTTPS Server starting on port %s (Dynamic TLS enabled)...\n", port)
+	if err := server.ListenAndServeTLS("", ""); err != nil {
 		log.Fatalf("Server shutdown failed: %v", err)
 	}
 }

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 export default function Dashboard({ onNavigate }) {
-  const { user, logout, apiFetch, serverUrl, updateServerUrl } = useAuth();
+  const { user, token, logout, apiFetch, serverUrl, updateServerUrl } = useAuth();
   const [credentials, setCredentials] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -28,6 +28,11 @@ export default function Dashboard({ onNavigate }) {
   const [sortBy, setSortBy] = useState('name-asc'); // 'name-asc' | 'name-desc' | 'newest' | 'oldest'
   const [itemsPerPage, setItemsPerPage] = useState(10); // 5, 10, 25, 50, 0 (All)
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [certFile, setCertFile] = useState(null);
+  const [keyFile, setKeyFile] = useState(null);
+  const [tlsUploadStatus, setTlsUploadStatus] = useState(null); // null | 'uploading' | 'success' | 'error'
+  const [tlsUploadError, setTlsUploadError] = useState('');
 
   useEffect(() => {
     setCurrentPage(1);
@@ -81,6 +86,49 @@ export default function Dashboard({ onNavigate }) {
     } catch (err) {
       setTestStatus('error');
       setTestError(err.message || 'Network error / server unreachable. Make sure protocol and port are correct.');
+    }
+  };
+
+  const handleUploadTLS = async (e) => {
+    e.preventDefault();
+    if (!certFile || !keyFile) {
+      setTlsUploadError('Please select both the certificate and private key files.');
+      setTlsUploadStatus('error');
+      return;
+    }
+
+    setTlsUploadStatus('uploading');
+    setTlsUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('certificate', certFile);
+      formData.append('privateKey', keyFile);
+
+      const cleanUrl = serverUrl.replace(/\/$/, '');
+      const response = await fetch(`${cleanUrl}/api/admin/settings/upload-tls`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        setTlsUploadStatus('success');
+        setCertFile(null);
+        setKeyFile(null);
+        if (document.getElementById('tls-cert-input')) document.getElementById('tls-cert-input').value = '';
+        if (document.getElementById('tls-key-input')) document.getElementById('tls-key-input').value = '';
+        setTimeout(() => setTlsUploadStatus(null), 5000);
+      } else {
+        const msg = await response.text();
+        setTlsUploadError(msg || 'Upload failed. Verify keypair validity.');
+        setTlsUploadStatus('error');
+      }
+    } catch (err) {
+      setTlsUploadError('Failed to communicate with backend server.');
+      setTlsUploadStatus('error');
     }
   };
 
@@ -843,12 +891,14 @@ export default function Dashboard({ onNavigate }) {
       {/* 4. Settings Modal */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md glass-panel p-6 rounded-2xl border border-gray-800 relative">
+          <div className="w-full max-w-lg glass-panel p-6 rounded-2xl border border-gray-800 relative">
             <button
               onClick={() => {
                 setIsSettingsOpen(false);
                 setTestStatus(null);
                 setTestError('');
+                setTlsUploadStatus(null);
+                setTlsUploadError('');
               }}
               className="absolute top-4 right-4 text-gray-500 hover:text-white"
             >
@@ -924,6 +974,61 @@ export default function Dashboard({ onNavigate }) {
                 Save Settings
               </button>
             </form>
+
+            {/* Custom TLS/SSL Certificates Upload (Certbot) */}
+            <div className="border-t border-gray-800 pt-5 mt-5">
+              <h4 className="text-xs uppercase text-gray-400 mb-3 font-semibold tracking-wider flex items-center gap-2">
+                Custom SSL Certificate (Certbot)
+              </h4>
+              <form onSubmit={handleUploadTLS} className="space-y-4">
+                <div>
+                  <label className="block text-2xs text-gray-500 mb-1">Certificate PEM (e.g. fullchain.pem)</label>
+                  <input
+                    id="tls-cert-input"
+                    type="file"
+                    accept=".pem,.crt,.cer"
+                    onChange={(e) => setCertFile(e.target.files[0])}
+                    className="w-full bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-xs text-gray-300 focus:outline-none focus:border-primaryNeon file:bg-gray-800 file:border-0 file:rounded-md file:text-2xs file:text-primaryNeon file:font-semibold file:px-3 file:py-1 file:mr-3 file:hover:bg-gray-700 cursor-pointer"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-2xs text-gray-500 mb-1">Private Key PEM (e.g. privkey.pem)</label>
+                  <input
+                    id="tls-key-input"
+                    type="file"
+                    accept=".pem,.key"
+                    onChange={(e) => setKeyFile(e.target.files[0])}
+                    className="w-full bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-xs text-gray-300 focus:outline-none focus:border-primaryNeon file:bg-gray-800 file:border-0 file:rounded-md file:text-2xs file:text-primaryNeon file:font-semibold file:px-3 file:py-1 file:mr-3 file:hover:bg-gray-700 cursor-pointer"
+                  />
+                </div>
+
+                {tlsUploadStatus === 'success' && (
+                  <div className="text-2xs text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    TLS certificates uploaded and applied successfully!
+                  </div>
+                )}
+
+                {tlsUploadStatus === 'error' && (
+                  <div className="text-2xs text-red-400 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                      Upload failed
+                    </div>
+                    <span className="text-gray-500 italic block pl-3">{tlsUploadError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={tlsUploadStatus === 'uploading'}
+                  className="w-full bg-purple-900/20 hover:bg-purple-900/40 text-purple-300 border border-purple-500/25 font-bold py-2.5 rounded-lg text-xs transition"
+                >
+                  {tlsUploadStatus === 'uploading' ? 'Uploading & Applying...' : 'Upload & Apply SSL Certificate'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
