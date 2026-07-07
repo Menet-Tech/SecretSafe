@@ -161,11 +161,10 @@ class WSBackgroundService : Service() {
         )
 
         // Approve Intent
-        val approveIntent = Intent(this, ApprovalReceiver::class.java).apply {
-            action = "com.secretsafe.APPROVE"
+        val approveIntent = Intent(this, NotificationActionActivity::class.java).apply {
             putExtra("request_id", msg.request_id)
         }
-        val approvePendingIntent = PendingIntent.getBroadcast(
+        val approvePendingIntent = PendingIntent.getActivity(
             this, 100, approveIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -189,7 +188,7 @@ class WSBackgroundService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_menu_ok, "Approve", approvePendingIntent)
+            .addAction(android.R.drawable.checkbox_on_background, "Approve", approvePendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Deny", denyPendingIntent)
             .setAutoCancel(true)
             .build()

@@ -300,7 +300,8 @@ fun DashboardScreen(token: String, serverUrl: String, onSignOut: () -> Unit) {
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f),
-                        containerColor = DarkCard
+                        focusedContainerColor = DarkCard,
+                        unfocusedContainerColor = DarkCard
                     ),
                     singleLine = true
                 )
