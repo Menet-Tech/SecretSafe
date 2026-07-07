@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"secretsafe/db"
 	"secretsafe/handlers"
@@ -64,6 +65,26 @@ func main() {
 	// Wrap entire router with CORS support
 	corsHandler := corsMiddleware(mux)
 
+	// Wrap with API Prefix stripping middleware if set
+	apiPrefix := os.Getenv("API_PREFIX")
+	var finalHandler http.Handler = corsHandler
+	if apiPrefix != "" {
+		if !strings.HasPrefix(apiPrefix, "/") {
+			apiPrefix = "/" + apiPrefix
+		}
+		apiPrefix = strings.TrimSuffix(apiPrefix, "/")
+
+		finalHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, apiPrefix) {
+				r.URL.Path = strings.TrimPrefix(r.URL.Path, apiPrefix)
+				if r.URL.Path == "" {
+					r.URL.Path = "/"
+				}
+			}
+			corsHandler.ServeHTTP(w, r)
+		})
+	}
+
 	// Ensure TLS Certificates exist (generate self-signed certs automatically if missing)
 	certFile := "cert.pem"
 	keyFile := "key.pem"
@@ -72,7 +93,7 @@ func main() {
 	}
 
 	log.Printf("SecretSafe HTTPS Server starting on port %s...\n", port)
-	if err := http.ListenAndServeTLS(":"+port, certFile, keyFile, corsHandler); err != nil {
+	if err := http.ListenAndServeTLS(":"+port, certFile, keyFile, finalHandler); err != nil {
 		log.Fatalf("Server shutdown failed: %v", err)
 	}
 }
