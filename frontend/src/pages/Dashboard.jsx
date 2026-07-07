@@ -19,9 +19,59 @@ export default function Dashboard({ onNavigate }) {
   const [tempServerUrl, setTempServerUrl] = useState(serverUrl);
   const [selectedCred, setSelectedCred] = useState(null);
 
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
+  const [testStatus, setTestStatus] = useState(null); // null | 'testing' | 'success' | 'error'
+  const [testError, setTestError] = useState('');
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await fetch(`${serverUrl}/api/health`);
+        if (response.ok) {
+          setServerStatus('connected');
+        } else {
+          setServerStatus('disconnected');
+        }
+      } catch (err) {
+        setServerStatus('disconnected');
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000);
+    return () => clearInterval(interval);
+  }, [serverUrl]);
+
   useEffect(() => {
     setTempServerUrl(serverUrl);
   }, [serverUrl]);
+
+  const handleTestConnection = async () => {
+    setTestStatus('testing');
+    setTestError('');
+    try {
+      const cleanUrl = tempServerUrl.replace(/\/$/, '');
+      const response = await fetch(`${cleanUrl}/api/health`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok') {
+          setTestStatus('success');
+        } else {
+          setTestStatus('error');
+          setTestError('Invalid health response format');
+        }
+      } else {
+        setTestStatus('error');
+        setTestError(`Server returned status code: ${response.status}`);
+      }
+    } catch (err) {
+      setTestStatus('error');
+      setTestError(err.message || 'Network error / server unreachable. Make sure protocol and port are correct.');
+    }
+  };
 
   // Form states
   const [credName, setCredName] = useState('');
@@ -204,6 +254,20 @@ export default function Dashboard({ onNavigate }) {
         <div className="flex items-center gap-3">
           <Shield className="w-6 h-6 text-primaryNeon animate-pulse" />
           <span className="font-bold text-white text-lg tracking-wider uppercase">SecretSafe</span>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold ${
+            serverStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+            serverStatus === 'disconnected' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+            'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              serverStatus === 'connected' ? 'bg-emerald-400 animate-pulse' :
+              serverStatus === 'disconnected' ? 'bg-red-400' :
+              'bg-gray-400'
+            }`}></span>
+            {serverStatus === 'connected' ? 'Connected' :
+             serverStatus === 'disconnected' ? 'Offline' :
+             'Checking...'}
+          </span>
         </div>
         
         <div className="flex items-center gap-4">
@@ -230,13 +294,15 @@ export default function Dashboard({ onNavigate }) {
             API Keys
           </button>
 
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 transition text-sm font-medium"
-          >
-            <Settings className="w-4 h-4 text-primaryNeon" />
-            Settings
-          </button>
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 transition text-sm font-medium"
+            >
+              <Settings className="w-4 h-4 text-primaryNeon" />
+              Settings
+            </button>
+          )}
 
           <button
             onClick={logout}
@@ -528,7 +594,11 @@ export default function Dashboard({ onNavigate }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-md glass-panel p-6 rounded-2xl border border-gray-800 relative">
             <button
-              onClick={() => setIsSettingsOpen(false)}
+              onClick={() => {
+                setIsSettingsOpen(false);
+                setTestStatus(null);
+                setTestError('');
+              }}
               className="absolute top-4 right-4 text-gray-500 hover:text-white"
             >
               <X className="w-5 h-5" />
@@ -544,23 +614,56 @@ export default function Dashboard({ onNavigate }) {
                 updateServerUrl(tempServerUrl);
                 setSuccess('Server API address updated successfully!');
                 setIsSettingsOpen(false);
+                setTestStatus(null);
+                setTestError('');
                 setTimeout(() => setSuccess(''), 3000);
               }}
               className="space-y-4"
             >
               <div>
                 <label className="block text-xs uppercase text-gray-400 mb-1 font-semibold">Server API Address</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full bg-darkBg border border-gray-800 rounded-lg py-2.5 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
-                  placeholder={config.backendUrl}
-                  value={tempServerUrl}
-                  onChange={(e) => setTempServerUrl(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    className="flex-1 bg-darkBg border border-gray-800 rounded-lg py-2.5 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
+                    placeholder={config.backendUrl}
+                    value={tempServerUrl}
+                    onChange={(e) => {
+                      setTempServerUrl(e.target.value);
+                      setTestStatus(null);
+                      setTestError('');
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestConnection}
+                    disabled={testStatus === 'testing'}
+                    className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-primaryNeon border border-gray-700/60 rounded-lg text-xs font-semibold transition"
+                  >
+                    {testStatus === 'testing' ? 'Testing...' : 'Test'}
+                  </button>
+                </div>
                 <p className="text-2xs text-gray-500 mt-1.5 leading-relaxed">
                   Enter the API server endpoint protocol and host/port (e.g. <code>https://domain.example</code> or <code>https://192.168.1.37:8051</code>).
                 </p>
+
+                {/* Connection Test feedback */}
+                {testStatus === 'success' && (
+                  <div className="text-2xs text-emerald-400 mt-2 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Connection test successful! Server is online and responsive.
+                  </div>
+                )}
+                {testStatus === 'error' && (
+                  <div className="text-2xs text-red-400 mt-2 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+                      Connection test failed
+                    </div>
+                    <span className="text-gray-500 italic block pl-3">{testError}</span>
+                  </div>
+                )}
               </div>
 
               <button

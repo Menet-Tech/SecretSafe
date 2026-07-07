@@ -39,6 +39,12 @@ func main() {
 
 	// Public routes
 	mux.HandleFunc("POST /api/auth/login", handlers.Login)
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
 
 	// Authenticated routes (wrapped in AuthMiddleware)
 	mux.Handle("GET /api/auth/me", middleware.AuthMiddleware(http.HandlerFunc(handlers.Me)))
@@ -61,6 +67,8 @@ func main() {
 	// Admin-only management endpoints (wrapped in Auth and Admin middlewares)
 	mux.Handle("POST /api/auth/register", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.Register))))
 	mux.Handle("GET /api/auth/users", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.ListUsers))))
+	mux.Handle("PUT /api/auth/users/{id}", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.UpdateUser))))
+	mux.Handle("DELETE /api/auth/users/{id}", middleware.AuthMiddleware(middleware.AdminMiddleware(http.HandlerFunc(handlers.DeleteUser))))
 
 	// Wrap entire router with CORS support
 	corsHandler := corsMiddleware(mux)

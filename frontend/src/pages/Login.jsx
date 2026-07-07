@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Shield, User, Lock, AlertCircle } from 'lucide-react';
 
@@ -8,6 +8,26 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await fetch(`${serverUrl}/api/health`);
+        if (response.ok) {
+          setServerStatus('connected');
+        } else {
+          setServerStatus('disconnected');
+        }
+      } catch (err) {
+        setServerStatus('disconnected');
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000);
+    return () => clearInterval(interval);
+  }, [serverUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -97,6 +117,27 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        <div className="flex justify-center items-center gap-2 mt-6 pt-4 border-t border-gray-800 text-xs">
+          <span className="text-gray-500">Server:</span>
+          <span className="text-gray-400 font-mono truncate max-w-[200px]" title={serverUrl}>
+            {serverUrl}
+          </span>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold ${
+            serverStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
+            serverStatus === 'disconnected' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
+            'bg-gray-500/10 text-gray-400 border border-gray-500/25'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              serverStatus === 'connected' ? 'bg-emerald-400 animate-pulse' :
+              serverStatus === 'disconnected' ? 'bg-red-400' :
+              'bg-gray-400'
+            }`}></span>
+            {serverStatus === 'connected' ? 'Connected' :
+             serverStatus === 'disconnected' ? 'Disconnected' :
+             'Checking...'}
+          </span>
+        </div>
       </div>
     </div>
   );

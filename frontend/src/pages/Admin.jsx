@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, UserPlus, Users, ArrowLeft, LogOut, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, UserPlus, Users, ArrowLeft, LogOut, CheckCircle, AlertTriangle, Edit, Trash2, X } from 'lucide-react';
 
 export default function Admin({ onNavigate }) {
   const { user, logout, apiFetch } = useAuth();
@@ -11,6 +11,13 @@ export default function Admin({ onNavigate }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Edit User State
+  const [editingUser, setEditingUser] = useState(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editRole, setEditRole] = useState('user');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -55,6 +62,75 @@ export default function Admin({ onNavigate }) {
       } else {
         const text = await response.text();
         setError(text || 'Failed to register user');
+      }
+    } catch (err) {
+      setError('Connection error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openEditModal = (usr) => {
+    setEditingUser(usr);
+    setEditUsername(usr.username);
+    setEditPassword('');
+    setEditRole(usr.role);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditUser = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await apiFetch(`/api/auth/users/${editingUser.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          username: editUsername,
+          password: editPassword,
+          role: editRole
+        })
+      });
+
+      if (response.ok) {
+        setSuccess(`User "${editUsername}" updated successfully!`);
+        setIsEditModalOpen(false);
+        setEditingUser(null);
+        fetchUsers();
+      } else {
+        const text = await response.text();
+        setError(text || 'Failed to update user');
+      }
+    } catch (err) {
+      setError('Connection error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (usr) => {
+    if (usr.id === user?.id) {
+      setError('You cannot delete your own account');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete user "${usr.username}"?`)) return;
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await apiFetch(`/api/auth/users/${usr.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setSuccess(`User "${usr.username}" deleted successfully!`);
+        fetchUsers();
+      } else {
+        const text = await response.text();
+        setError(text || 'Failed to delete user');
       }
     } catch (err) {
       setError('Connection error occurred');
@@ -173,6 +249,7 @@ export default function Admin({ onNavigate }) {
                   <th className="py-3 px-4">Username</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Registration Date</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
@@ -194,6 +271,29 @@ export default function Admin({ onNavigate }) {
                     <td className="py-3.5 px-4 text-xs text-gray-500">
                       {new Date(usr.created_at).toLocaleString()}
                     </td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => openEditModal(usr)}
+                          className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition"
+                          title="Edit User"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(usr)}
+                          disabled={usr.id === user?.id}
+                          className={`p-1.5 rounded-lg transition ${
+                            usr.id === user?.id
+                              ? 'bg-gray-900 text-gray-700 cursor-not-allowed'
+                              : 'bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-500/10 hover:border-red-500/25'
+                          }`}
+                          title={usr.id === user?.id ? "You cannot delete yourself" : "Delete User"}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -201,6 +301,69 @@ export default function Admin({ onNavigate }) {
           </div>
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md glass-panel p-6 rounded-2xl border border-gray-800 relative">
+            <button
+              onClick={() => { setIsEditModalOpen(false); setEditingUser(null); }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Edit className="w-5 h-5 text-primaryNeon" />
+              Edit Account
+            </h3>
+
+            <form onSubmit={handleEditUser} className="space-y-4">
+              <div>
+                <label className="block text-xs uppercase text-gray-400 mb-1">Username</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
+                  value={editUsername}
+                  onChange={e => setEditUsername(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase text-gray-400 mb-1">Password (Leave empty to keep current)</label>
+                <input
+                  type="password"
+                  className="w-full bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
+                  placeholder="New Password value (optional)"
+                  value={editPassword}
+                  onChange={e => setEditPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase text-gray-400 mb-1">System Role</label>
+                <select
+                  className="w-full bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
+                  value={editRole}
+                  onChange={e => setEditRole(e.target.value)}
+                  disabled={editingUser?.id === user?.id}
+                >
+                  <option value="user">Regular User (Access Web/APK)</option>
+                  <option value="admin">Optionally Admin (Web Management)</option>
+                </select>
+                {editingUser?.id === user?.id && (
+                  <p className="text-2xs text-gray-500 mt-1">You cannot change your own role to prevent lockout.</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-primaryNeon text-darkBg font-bold py-2.5 rounded-lg text-sm mt-4 hover:opacity-95 transition"
+              >
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

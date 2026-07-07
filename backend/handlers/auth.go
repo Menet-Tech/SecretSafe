@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"secretsafe/db"
@@ -177,4 +178,112 @@ func ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
+}
+
+type UpdateUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
+
+// UpdateUser updates a user profile or password (Admin-only)
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		http.Error(w, "User ID required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	var req UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	if req.Username == "" {
+		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if req.Role != "admin" && req.Role != "user" {
+		req.Role = "user"
+	}
+
+	// Prevent demoting yourself from admin to user to avoid lock out
+	callerID := r.Context().Value(middleware.UserIDKey).(int)
+	if userID == callerID {
+		if req.Role != "admin" {
+			http.Error(w, "You cannot demote yourself from admin", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if req.Password != "" {
+		passwordHash, err := security.HashPassword(req.Password)
+		if err != nil {
+			http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = db.DB.Exec("UPDATE users SET username = ?, password_hash = ?, role = ? WHERE id = ?", req.Username, passwordHash, req.Role, userID)
+		if err != nil {
+			http.Error(w, "Username already exists or database error", http.StatusConflict)
+			return
+		}
+	} else {
+		_, err = db.DB.Exec("UPDATE users SET username = ?, role = ? WHERE id = ?", req.Username, req.Role, userID)
+		if err != nil {
+			http.Error(w, "Username already exists or database error", http.StatusConflict)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "User updated successfully"})
+}
+
+// DeleteUser deletes a user from the system (Admin-only)
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		http.Error(w, "User ID required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	callerID := r.Context().Value(middleware.UserIDKey).(int)
+	if userID == callerID {
+		http.Error(w, "You cannot delete your own account", http.StatusBadRequest)
+		return
+	}
+
+	_, err = db.DB.Exec("DELETE FROM users WHERE id = ?", userID)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
 }
