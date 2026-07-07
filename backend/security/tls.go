@@ -12,12 +12,30 @@ import (
 	"time"
 )
 
-// EnsureTLSCertificates checks if cert.pem and key.pem exist; if not, generates them automatically
+// EnsureTLSCertificates checks if cert.pem and key.pem exist; if not, generates them automatically.
+// If they do exist, it parses the cert to verify if it is older than 30 days, automatically regenerating it to rotate monthly.
 func EnsureTLSCertificates(certPath, keyPath string) error {
 	_, errCert := os.Stat(certPath)
 	_, errKey := os.Stat(keyPath)
 	if errCert == nil && errKey == nil {
-		return nil // Certificates already generated
+		// Parse existing certificate to verify age/expiration
+		certBytes, err := os.ReadFile(certPath)
+		if err == nil {
+			block, _ := pem.Decode(certBytes)
+			if block != nil && block.Type == "CERTIFICATE" {
+				cert, err := x509.ParseCertificate(block.Bytes)
+				if err == nil {
+					// Rotate monthly: if created > 30 days ago, or expiring in < 30 days
+					if time.Now().After(cert.NotBefore.Add(30 * 24 * time.Hour)) || time.Now().After(cert.NotAfter.Add(-30 * 24 * time.Hour)) {
+						// Remove files to trigger regeneration below
+						_ = os.Remove(certPath)
+						_ = os.Remove(keyPath)
+					} else {
+						return nil // Fresh certificates already exist
+					}
+				}
+			}
+		}
 	}
 
 	// Generate a 2048-bit RSA key pair

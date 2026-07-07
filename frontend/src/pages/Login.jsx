@@ -136,6 +136,25 @@ export default function Login() {
              'Checking...'}
           </span>
         </div>
+
+        {serverStatus === 'disconnected' && (
+          <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/25 text-amber-300 rounded-lg text-xs space-y-1">
+            <p className="font-semibold text-amber-400">Having connection issues?</p>
+            <p>If you are using a self-signed certificate, you must authorize it in your browser first.</p>
+            <p>
+              Please open{' '}
+              <a
+                href={`${serverUrl.replace(/\/$/, '')}/api/health`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-bold text-primaryNeon hover:opacity-85"
+              >
+                this health check link
+              </a>
+              , click <strong>"Advanced"</strong> and choose <strong>"Proceed to ... (unsafe)"</strong>, then return here and refresh.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
