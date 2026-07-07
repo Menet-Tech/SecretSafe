@@ -107,9 +107,10 @@ fun ApprovalDialog(request: WSMessage) {
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
-                        Text("REJECT", fontWeight = FontWeight.Bold)
+                        Text("REJECT", fontWeight = FontWeight.Bold, maxLines = 1)
                     }
 
                     Button(
@@ -138,9 +139,10 @@ fun ApprovalDialog(request: WSMessage) {
                             contentColor = MaterialTheme.colorScheme.background
                         ),
                         modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
-                        Text("APPROVE", fontWeight = FontWeight.Bold)
+                        Text("APPROVE", fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
             }

@@ -68,6 +68,48 @@ fun DashboardScreen(token: String, serverUrl: String, onSignOut: () -> Unit) {
     var showPinFallback by remember { mutableStateOf(false) }
     var pendingRevealCredId by remember { mutableStateOf<Int?>(null) }
 
+    var searchQuery by remember { mutableStateOf("") }
+    var viewMode by remember { mutableStateOf("grid") } // "grid" | "list"
+    var sortBy by remember { mutableStateOf("name-asc") } // "name-asc" | "name-desc" | "newest" | "oldest"
+    var itemsPerPage by remember { mutableStateOf(10) } // 5, 10, 25, 50, 0 (All)
+    var currentPage by remember { mutableStateOf(1) }
+    var showSortDropdown by remember { mutableStateOf(false) }
+    var showPageDropdown by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery, sortBy, itemsPerPage) {
+        currentPage = 1
+    }
+
+    val filteredCredentials = remember(credentials, searchQuery, sortBy) {
+        credentials.filter { cred ->
+            val q = searchQuery.lowercase()
+            cred.name.lowercase().contains(q) ||
+            cred.username.lowercase().contains(q) ||
+            (cred.address?.lowercase()?.contains(q) == true)
+        }.sortedWith { a, b ->
+            when (sortBy) {
+                "name-asc" -> a.name.compareTo(b.name, ignoreCase = true)
+                "name-desc" -> b.name.compareTo(a.name, ignoreCase = true)
+                "newest" -> b.id.compareTo(a.id)
+                "oldest" -> a.id.compareTo(b.id)
+                else -> 0
+            }
+        }
+    }
+
+    val totalItems = filteredCredentials.size
+    val limit = if (itemsPerPage == 0) totalItems else itemsPerPage
+    val totalPages = if (limit == 0) 1 else Math.max(1, (totalItems + limit - 1) / limit)
+    val activePage = Math.min(currentPage, totalPages)
+    val startIndex = (activePage - 1) * limit
+    val paginatedCredentials = remember(filteredCredentials, startIndex, limit) {
+        if (filteredCredentials.isEmpty() || startIndex >= filteredCredentials.size) {
+            emptyList()
+        } else {
+            filteredCredentials.subList(startIndex, Math.min(startIndex + limit, filteredCredentials.size))
+        }
+    }
+
     val fetch = {
         loading = true
         errorMsg = ""
@@ -100,6 +142,26 @@ fun DashboardScreen(token: String, serverUrl: String, onSignOut: () -> Unit) {
                     revealError = err.message ?: "Failed to retrieve password"
                 }
             )
+        }
+    }
+
+    val handleRevealClick: (CredentialItem) -> Unit = { cred ->
+        if (activity != null) {
+            BiometricHelper.authenticate(
+                activity = activity,
+                title = "Reveal Password",
+                subtitle = "Authenticate to decrypt password for ${cred.name}",
+                onSuccess = {
+                    triggerReveal(cred.id)
+                },
+                onFailure = { err ->
+                    pendingRevealCredId = cred.id
+                    showPinFallback = true
+                }
+            )
+        } else {
+            pendingRevealCredId = cred.id
+            showPinFallback = true
         }
     }
 
@@ -222,6 +284,167 @@ fun DashboardScreen(token: String, serverUrl: String, onSignOut: () -> Unit) {
                 color = MaterialTheme.colorScheme.onBackground
             )
 
+            // Controls Bar
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                // Search Input
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search credentials...", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)) },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f),
+                        containerColor = DarkCard
+                    ),
+                    singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Selectors Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Sort selector
+                        Box {
+                            Button(
+                                onClick = { showSortDropdown = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = DarkCard,
+                                    contentColor = MaterialTheme.colorScheme.onBackground
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text(
+                                    text = "Sort: " + when (sortBy) {
+                                        "name-asc" -> "A-Z"
+                                        "name-desc" -> "Z-A"
+                                        "newest" -> "Newest"
+                                        "oldest" -> "Oldest"
+                                        else -> ""
+                                    },
+                                    fontSize = 11.sp
+                                )
+                            }
+                            
+                            DropdownMenu(
+                                expanded = showSortDropdown,
+                                onDismissRequest = { showSortDropdown = false },
+                                modifier = Modifier.background(DarkCard)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Name (A-Z)", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { sortBy = "name-asc"; showSortDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Name (Z-A)", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { sortBy = "name-desc"; showSortDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Newest", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { sortBy = "newest"; showSortDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Oldest", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { sortBy = "oldest"; showSortDropdown = false }
+                                )
+                            }
+                        }
+
+                        // Page Limit Selector
+                        Box {
+                            Button(
+                                onClick = { showPageDropdown = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = DarkCard,
+                                    contentColor = MaterialTheme.colorScheme.onBackground
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text(
+                                    text = "Show: " + if (itemsPerPage == 0) "All" else "$itemsPerPage Items",
+                                    fontSize = 11.sp
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showPageDropdown,
+                                onDismissRequest = { showPageDropdown = false },
+                                modifier = Modifier.background(DarkCard)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("5 Items", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { itemsPerPage = 5; showPageDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("10 Items", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { itemsPerPage = 10; showPageDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("25 Items", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { itemsPerPage = 25; showPageDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("50 Items", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { itemsPerPage = 50; showPageDropdown = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("All", color = MaterialTheme.colorScheme.onBackground) },
+                                    onClick = { itemsPerPage = 0; showPageDropdown = false }
+                                )
+                            }
+                        }
+                    }
+
+                    // View Mode Toggle (Grid vs List Detail)
+                    Row(
+                        modifier = Modifier
+                            .background(DarkCard, shape = RoundedCornerShape(8.dp))
+                            .padding(2.dp)
+                            .height(36.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { viewMode = "grid" },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (viewMode == "grid") MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (viewMode == "grid") MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxHeight()
+                        ) {
+                            Text("Grid", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { viewMode = "list" },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (viewMode == "list") MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (viewMode == "list") MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxHeight()
+                        ) {
+                            Text("List", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             if (loading) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -252,94 +475,192 @@ fun DashboardScreen(token: String, serverUrl: String, onSignOut: () -> Unit) {
                         Text(text = "Vault is empty", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f))
                     }
                 }
+            } else if (filteredCredentials.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "No results icon",
+                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "No matching credentials found", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f))
+                    }
+                }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(credentials) { cred ->
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkCard),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = "Lock indicator icon",
-                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = cred.name,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "User profile icon",
-                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = cred.username,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                }
-                                if (!cred.address.isNullOrBlank()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Host: ${cred.address}",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(start = 20.dp)
-                                    )
-                                }
+                if (viewMode == "grid") {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(paginatedCredentials) { cred ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = DarkCard),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Lock,
+                                            contentDescription = "Lock indicator icon",
+                                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = cred.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = "User profile icon",
+                                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = cred.username,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+                                    if (!cred.address.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Host: ${cred.address}",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier.padding(start = 20.dp)
+                                        )
+                                    }
 
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                // Reveal Password Button (strictly biometric with PIN fallback)
-                                Button(
-                                    onClick = {
-                                        if (activity != null) {
-                                            BiometricHelper.authenticate(
-                                                activity = activity,
-                                                title = "Reveal Password",
-                                                subtitle = "Authenticate to decrypt password for ${cred.name}",
-                                                onSuccess = {
-                                                    triggerReveal(cred.id)
-                                                },
-                                                onFailure = { err ->
-                                                    // Fallback to PIN dialog
-                                                    pendingRevealCredId = cred.id
-                                                    showPinFallback = true
-                                                }
-                                            )
-                                        } else {
-                                            pendingRevealCredId = cred.id
-                                            showPinFallback = true
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                        contentColor = MaterialTheme.colorScheme.primary
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.padding(start = 20.dp)
-                                ) {
-                                    Icon(Icons.Default.Lock, contentDescription = "Reveal", modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Reveal Password", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    Button(
+                                        onClick = { handleRevealClick(cred) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                            contentColor = MaterialTheme.colorScheme.primary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.padding(start = 20.dp)
+                                    ) {
+                                        Icon(Icons.Default.Lock, contentDescription = "Reveal", modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Reveal Password", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(paginatedCredentials) { cred ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = DarkCard),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                        Text(
+                                            text = cred.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = cred.username,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                            maxLines = 1
+                                        )
+                                        if (!cred.address.isNullOrBlank()) {
+                                            Text(
+                                                text = cred.address,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+
+                                    Button(
+                                        onClick = { handleRevealClick(cred) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                            contentColor = MaterialTheme.colorScheme.primary
+                                        ),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(30.dp)
+                                    ) {
+                                        Text("Reveal", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Pagination Controls
+                if (itemsPerPage > 0 && totalPages > 1) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Page $activePage of $totalPages",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { currentPage = Math.max(currentPage - 1, 1) },
+                                enabled = activePage > 1,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = DarkCard,
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text("Prev", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { currentPage = Math.min(currentPage + 1, totalPages) },
+                                enabled = activePage < totalPages,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = DarkCard,
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text("Next", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
