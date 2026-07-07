@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Server, User, Lock, AlertCircle } from 'lucide-react';
+import { Shield, User, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, serverUrl } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [serverUrl, setServerUrl] = useState('http://localhost:8080');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,7 +17,7 @@ export default function Login() {
     try {
       await login(username, password, serverUrl);
     } catch (err) {
-      setError(err.message || 'Login failed. Please check your credentials and server URL.');
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -47,24 +46,6 @@ export default function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
-              Server Host Address
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                <Server className="w-5 h-5" />
-              </span>
-              <input
-                type="text"
-                required
-                className="w-full bg-darkBg/50 border border-gray-700/60 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-primaryNeon transition"
-                placeholder="http://localhost:8080"
-                value={serverUrl}
-                onChange={(e) => setServerUrl(e.target.value)}
-              />
-            </div>
-          </div>
 
           <div>
             <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">

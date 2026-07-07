@@ -4,8 +4,26 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const getInitialServerUrl = () => {
+    const stored = localStorage.getItem('serverUrl');
+    if (stored) return stored;
+    
+    // Fallback: If local development, use https://localhost:8051
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'https://localhost:8051';
+    }
+    
+    // If accessed via default Vite dev port (8050), backend is on same host port 8051
+    if (window.location.port === '8050') {
+      return `https://${window.location.hostname}:8051`;
+    }
+    
+    // In production (e.g. https://domain.example reverse proxy), use current origin
+    return `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
+  };
+
   const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [serverUrl, setServerUrl] = useState(localStorage.getItem('serverUrl') || 'https://localhost:8051');
+  const [serverUrl, setServerUrl] = useState(getInitialServerUrl());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -91,8 +109,14 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const updateServerUrl = (url) => {
+    const cleanUrl = url.replace(/\/$/, '');
+    setServerUrl(cleanUrl);
+    localStorage.setItem('serverUrl', cleanUrl);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, serverUrl, loading, login, logout, apiFetch }}>
+    <AuthContext.Provider value={{ user, token, serverUrl, updateServerUrl, loading, login, logout, apiFetch }}>
       {children}
     </AuthContext.Provider>
   );

@@ -8,7 +8,16 @@ FRONTEND_PID_FILE="/tmp/secretsafe_frontend.pid"
 BACKEND_LOG="/tmp/secretsafe_backend.log"
 FRONTEND_LOG="/tmp/secretsafe_frontend.log"
 
-export PORT=8051
+# Load environment variables if .env exists
+if [ -f .env ]; then
+    # Export all variables from .env file
+    export $(grep -v '^#' .env | xargs)
+fi
+
+# Fallback to port 8051 if not defined in .env
+if [ -z "$PORT" ]; then
+    export PORT=8051
+fi
 
 start_backend() {
     echo -n "Starting SecretSafe Backend on port 8051... "

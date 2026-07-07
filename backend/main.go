@@ -102,16 +102,25 @@ func seedAdmin() {
 	}
 
 	if count == 0 {
-		hashedPassword, err := security.HashPassword("admin123")
+		adminUser := os.Getenv("ADMIN_USER")
+		if adminUser == "" {
+			adminUser = "admin"
+		}
+		adminPass := os.Getenv("ADMIN_PASS")
+		if adminPass == "" {
+			adminPass = "admin123"
+		}
+
+		hashedPassword, err := security.HashPassword(adminPass)
 		if err != nil {
 			log.Fatalf("Failed to hash default admin password: %v", err)
 		}
 
-		_, err = db.DB.Exec("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", "admin", hashedPassword, "admin")
+		_, err = db.DB.Exec("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", adminUser, hashedPassword, "admin")
 		if err != nil {
 			log.Fatalf("Failed to seed default admin: %v", err)
 		}
 
-		log.Println("[Database] Seeded default admin account: admin / admin123")
+		log.Printf("[Database] Seeded default admin account: %s / %s\n", adminUser, adminPass)
 	}
 }

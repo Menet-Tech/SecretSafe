@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Shield, Key, Plus, Globe, User, Eye, EyeOff, Trash2, Edit, Copy,
-  LogOut, ShieldAlert, Check, X, Smartphone, AlertCircle, Loader
+  LogOut, ShieldAlert, Check, X, Smartphone, AlertCircle, Loader, Settings
 } from 'lucide-react';
 
 export default function Dashboard({ onNavigate }) {
-  const { user, logout, apiFetch } = useAuth();
+  const { user, logout, apiFetch, serverUrl, updateServerUrl } = useAuth();
   const [credentials, setCredentials] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -14,7 +14,13 @@ export default function Dashboard({ onNavigate }) {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [tempServerUrl, setTempServerUrl] = useState(serverUrl);
   const [selectedCred, setSelectedCred] = useState(null);
+
+  useEffect(() => {
+    setTempServerUrl(serverUrl);
+  }, [serverUrl]);
 
   // Form states
   const [credName, setCredName] = useState('');
@@ -221,6 +227,14 @@ export default function Dashboard({ onNavigate }) {
           >
             <Key className="w-4 h-4 text-primaryNeon" />
             API Keys
+          </button>
+
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 transition text-sm font-medium"
+          >
+            <Settings className="w-4 h-4 text-primaryNeon" />
+            Settings
           </button>
 
           <button
@@ -502,6 +516,57 @@ export default function Dashboard({ onNavigate }) {
               </div>
               <button type="submit" className="w-full bg-primaryNeon text-darkBg font-bold py-2.5 rounded-lg text-sm mt-4 hover:opacity-95 transition">
                 Save Changes
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md glass-panel p-6 rounded-2xl border border-gray-800 relative">
+            <button
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primaryNeon" />
+              Settings
+            </h3>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                updateServerUrl(tempServerUrl);
+                setSuccess('Server API address updated successfully!');
+                setIsSettingsOpen(false);
+                setTimeout(() => setSuccess(''), 3000);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs uppercase text-gray-400 mb-1 font-semibold">Server API Address</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-darkBg border border-gray-800 rounded-lg py-2.5 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
+                  placeholder="https://localhost:8051"
+                  value={tempServerUrl}
+                  onChange={(e) => setTempServerUrl(e.target.value)}
+                />
+                <p className="text-2xs text-gray-500 mt-1.5 leading-relaxed">
+                  Enter the API server endpoint protocol and host/port (e.g. <code>https://domain.example</code> or <code>https://192.168.1.37:8051</code>).
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-primaryNeon text-darkBg font-bold py-3 rounded-lg text-sm mt-4 hover:opacity-95 transition"
+              >
+                Save Settings
               </button>
             </form>
           </div>
