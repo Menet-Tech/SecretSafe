@@ -6,7 +6,7 @@ import { config } from './src/config.js'
 export default defineConfig({
   plugins: [react()],
   server: {
-    allowedHosts: true,
+    allowedHosts: ["sf.menet.my.id"],
     hmr: {
       host: config.domain === 'localhost' ? 'localhost' : config.domain,
       protocol: config.domain === 'localhost' ? 'ws' : 'wss',

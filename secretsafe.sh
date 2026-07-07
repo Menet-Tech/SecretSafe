@@ -132,6 +132,52 @@ status() {
     fi
 }
 
+reinstall() {
+    echo "========================================================="
+    echo "  WARNING: This will delete ALL database data, certificates,"
+    echo "  and configuration files. You will need to setup again. "
+    echo "========================================================="
+    read -p "Are you sure you want to proceed? (y/N): " CONFIRM
+    CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
+    if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "yes" ]; then
+        echo "Reinstallation cancelled."
+        return
+    fi
+
+    echo "Stopping current services..."
+    stop_backend
+    stop_frontend
+
+    echo "Cleaning up configuration and database files..."
+    rm -f .env
+    rm -f frontend/src/config.js
+    rm -f backend/secretsafe.db
+    rm -f backend/secretsafe
+    rm -f backend/cert.pem
+    rm -f backend/key.pem
+
+    echo ""
+    echo "========================================================="
+    echo "  Starting Setup Wizard... "
+    echo "========================================================="
+    if [ -f "./setup.sh" ]; then
+        bash ./setup.sh
+    else
+        echo "Error: setup.sh not found!"
+        return
+    fi
+
+    # Reload variables from new .env
+    if [ -f .env ]; then
+        export $(grep -v '^#' .env | tr -d '\r' | xargs)
+    fi
+
+    echo ""
+    echo "Rebuilding and restarting services..."
+    start_backend
+    start_frontend
+}
+
 case "$1" in
     start)
         start_backend
@@ -151,8 +197,11 @@ case "$1" in
     status)
         status
         ;;
+    reinstall)
+        reinstall
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
+        echo "Usage: $0 {start|stop|restart|status|reinstall}"
         exit 1
         ;;
 esac
