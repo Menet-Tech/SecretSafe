@@ -23,6 +23,16 @@ export default function Dashboard({ onNavigate }) {
   const [testStatus, setTestStatus] = useState(null); // null | 'testing' | 'success' | 'error'
   const [testError, setTestError] = useState('');
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [sortBy, setSortBy] = useState('name-asc'); // 'name-asc' | 'name-desc' | 'newest' | 'oldest'
+  const [itemsPerPage, setItemsPerPage] = useState(10); // 5, 10, 25, 50, 0 (All)
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy, itemsPerPage]);
+
   useEffect(() => {
     const checkConnection = async () => {
       try {
@@ -248,6 +258,35 @@ export default function Dashboard({ onNavigate }) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const filteredCredentials = credentials
+    .filter(cred => {
+      const q = searchQuery.toLowerCase();
+      return (
+        cred.name.toLowerCase().includes(q) ||
+        cred.username.toLowerCase().includes(q) ||
+        (cred.address && cred.address.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name-asc') {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === 'name-desc') {
+        return b.name.localeCompare(a.name);
+      } else if (sortBy === 'newest') {
+        return b.id - a.id;
+      } else if (sortBy === 'oldest') {
+        return a.id - b.id;
+      }
+      return 0;
+    });
+
+  const totalItems = filteredCredentials.length;
+  const limit = itemsPerPage === 0 ? totalItems : itemsPerPage;
+  const totalPages = Math.ceil(totalItems / limit) || 1;
+  const activePage = Math.min(currentPage, totalPages);
+  const startIndex = (activePage - 1) * limit;
+  const paginatedCredentials = filteredCredentials.slice(startIndex, startIndex + limit);
+
   return (
     <div className="min-h-screen bg-darkBg text-textLight">
       {/* Navbar */}
@@ -353,16 +392,97 @@ export default function Dashboard({ onNavigate }) {
           </button>
         </div>
 
-        {/* Credentials Grid */}
+        {/* Controls Bar */}
+        <div className="glass-panel p-4 mb-6 rounded-xl border border-gray-800 flex flex-wrap items-center justify-between gap-4">
+          {/* Search Box */}
+          <div className="flex-1 min-w-[200px] relative">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </span>
+            <input
+              type="text"
+              placeholder="Search by name, username, or URL..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-darkBg border border-gray-800 rounded-lg py-2 pl-9 pr-4 text-white text-sm focus:outline-none focus:border-primaryNeon transition"
+            />
+          </div>
+
+          {/* Sort & Pagination Limit & View mode */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-primaryNeon"
+              >
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
+
+            {/* Page Size Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Show:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="bg-darkBg border border-gray-800 rounded-lg py-2 px-3 text-white text-xs focus:outline-none focus:border-primaryNeon"
+              >
+                <option value={5}>5 items</option>
+                <option value={10}>10 items</option>
+                <option value={25}>25 items</option>
+                <option value={50}>50 items</option>
+                <option value={0}>All</option>
+              </select>
+            </div>
+
+            {/* View Mode Toggle Buttons */}
+            <div className="flex bg-darkBg border border-gray-800 p-0.5 rounded-lg">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                  viewMode === 'grid'
+                    ? 'bg-primaryNeon text-darkBg'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Grid
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                  viewMode === 'list'
+                    ? 'bg-primaryNeon text-darkBg'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                List Detail
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Credentials Grid or List */}
         {credentials.length === 0 ? (
           <div className="glass-panel p-12 rounded-2xl text-center border border-gray-800 flex flex-col items-center">
             <Key className="w-12 h-12 text-gray-600 mb-4" />
             <p className="text-gray-400 font-medium">No credentials saved yet.</p>
             <p className="text-sm text-gray-600 mt-1">Click the "New Credential" button to get started.</p>
           </div>
-        ) : (
+        ) : filteredCredentials.length === 0 ? (
+          <div className="glass-panel p-12 rounded-2xl text-center border border-gray-800 flex flex-col items-center">
+            <AlertCircle className="w-12 h-12 text-gray-600 mb-4" />
+            <p className="text-gray-400 font-medium">No matching credentials found.</p>
+            <p className="text-sm text-gray-600 mt-1">Try refining your search query.</p>
+          </div>
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {credentials.map((cred) => (
+            {paginatedCredentials.map((cred) => (
               <div key={cred.id} className="glass-panel p-6 rounded-2xl border border-gray-800 flex flex-col justify-between hover:border-primaryNeon/30 transition-all duration-300">
                 <div>
                   <div className="flex items-start justify-between mb-4">
@@ -420,6 +540,136 @@ export default function Dashboard({ onNavigate }) {
                 </div>
               </div>
             ))}
+          </div>
+        ) : (
+          <div className="glass-panel rounded-2xl border border-gray-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase bg-darkBg/60 text-gray-400 border-b border-gray-800">
+                  <tr>
+                    <th className="py-4 px-6">Name</th>
+                    <th className="py-4 px-6">Username / Email</th>
+                    <th className="py-4 px-6">Website / URL</th>
+                    <th className="py-4 px-6">Password</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/50">
+                  {paginatedCredentials.map((cred) => (
+                    <tr key={cred.id} className="hover:bg-gray-800/30 transition">
+                      <td className="py-4 px-6 font-semibold text-white truncate max-w-[150px]">
+                        {cred.name}
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-1.5 text-gray-300">
+                          <span className="truncate max-w-[180px]">{cred.username}</span>
+                          <button onClick={() => copyToClipboard(cred.username, `user-${cred.id}`)} className="text-gray-500 hover:text-white">
+                            {copiedId === `user-${cred.id}` ? <Check className="w-3.5 h-3.5 text-primaryNeon" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        {cred.address ? (
+                          <a
+                            href={cred.address.startsWith('http') ? cred.address : `https://${cred.address}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primaryNeon hover:underline flex items-center gap-1 truncate max-w-[180px]"
+                          >
+                            <Globe className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{cred.address}</span>
+                          </a>
+                        ) : (
+                          <span className="text-gray-600">-</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 font-mono text-gray-500">
+                        ••••••••••••
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => handleRetrieve(cred)}
+                            className="flex items-center gap-1 text-xs font-semibold text-primaryNeon bg-primaryNeon/10 hover:bg-primaryNeon/20 border border-primaryNeon/25 px-2.5 py-1.5 rounded-lg transition"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Reveal
+                          </button>
+                          <button
+                            onClick={() => openEditModal(cred)}
+                            className="p-2 rounded-lg bg-gray-850 hover:bg-gray-800 text-gray-400 hover:text-white transition"
+                            title="Edit"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(cred.id)}
+                            className="p-2 rounded-lg bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-500/10 hover:border-red-500/25 transition"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {itemsPerPage > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <span className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-white">{startIndex + 1}</span> to{' '}
+              <span className="font-semibold text-white">
+                {Math.min(startIndex + limit, totalItems)}
+              </span>{' '}
+              of <span className="font-semibold text-white">{totalItems}</span> credentials
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                disabled={activePage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                  activePage === 1
+                    ? 'border-gray-800/50 bg-gray-900/20 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-850 bg-gray-800 hover:bg-gray-700 text-white'
+                }`}
+              >
+                Previous
+              </button>
+              
+              {/* Page numbers */}
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                    activePage === i + 1
+                      ? 'bg-primaryNeon text-darkBg'
+                      : 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-850'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+
+              <button
+                disabled={activePage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                  activePage === totalPages
+                    ? 'border-gray-800/50 bg-gray-900/20 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-850 bg-gray-800 hover:bg-gray-700 text-white'
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
