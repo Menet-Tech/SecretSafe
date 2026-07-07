@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { config } from '../config';
 
 const AuthContext = createContext(null);
 
@@ -8,18 +9,7 @@ export const AuthProvider = ({ children }) => {
     const stored = localStorage.getItem('serverUrl');
     if (stored) return stored;
     
-    // Fallback: If local development, use https://localhost:8051
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'https://localhost:8051';
-    }
-    
-    // If accessed via default Vite dev port (8050), backend is on same host port 8051
-    if (window.location.port === '8050') {
-      return `https://${window.location.hostname}:8051`;
-    }
-    
-    // In production (e.g. https://domain.example reverse proxy), use current origin
-    return `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
+    return config.backendUrl;
   };
 
   const [token, setToken] = useState(localStorage.getItem('token') || '');

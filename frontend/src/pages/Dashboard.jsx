@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { config } from '../config';
 import {
   Shield, Key, Plus, Globe, User, Eye, EyeOff, Trash2, Edit, Copy,
   LogOut, ShieldAlert, Check, X, Smartphone, AlertCircle, Loader, Settings
@@ -553,7 +554,7 @@ export default function Dashboard({ onNavigate }) {
                   type="text"
                   required
                   className="w-full bg-darkBg border border-gray-800 rounded-lg py-2.5 px-3 text-white text-sm focus:outline-none focus:border-primaryNeon"
-                  placeholder="https://localhost:8051"
+                  placeholder={config.backendUrl}
                   value={tempServerUrl}
                   onChange={(e) => setTempServerUrl(e.target.value)}
                 />

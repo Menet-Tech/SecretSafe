@@ -13,6 +13,9 @@ DOMAIN=${DOMAIN:-localhost}
 read -p "Enter Backend HTTPS Port [8051]: " PORT
 PORT=${PORT:-8051}
 
+read -p "Enter Backend API URL (e.g. https://domain.example:8051) [https://$DOMAIN:$PORT]: " BACKEND_URL
+BACKEND_URL=${BACKEND_URL:-https://$DOMAIN:$PORT}
+
 read -p "Enter Admin Username [admin]: " ADMIN_USER
 ADMIN_USER=${ADMIN_USER:-admin}
 
@@ -39,21 +42,31 @@ ADMIN_USER=$ADMIN_USER
 ADMIN_PASS=$ADMIN_PASS
 MASTER_KEY=$MASTER_KEY
 DOMAIN=$DOMAIN
+BACKEND_URL=$BACKEND_URL
 EOF
 
 # Set strict file read/write permissions for the environment file
 chmod 600 .env
 
+# 3. Dynamically generate frontend config.js
+cat <<EOF > frontend/src/config.js
+export const config = {
+  domain: '$DOMAIN',
+  backendUrl: '$BACKEND_URL'
+};
+EOF
+
 echo ""
 echo "============================================="
 echo "   Configuration Generated Successfully!      "
 echo "============================================="
-echo "File created: .env"
+echo "Files updated: .env and frontend/src/config.js"
 echo ""
 echo "Values Configured:"
 echo "---------------------------------------------"
 echo "Domain:         $DOMAIN"
 echo "Port:           $PORT"
+echo "Backend URL:    $BACKEND_URL"
 echo "Admin User:     $ADMIN_USER"
 echo "Admin Password: $ADMIN_PASS"
 echo "Master Key:     (Generated and stored securely)"
